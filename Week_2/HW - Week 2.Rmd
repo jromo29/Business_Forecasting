@@ -1,0 +1,437 @@
+---
+title: "Business Forecasting Week 2 HW"
+author: "Juan Romo"
+output: html_notebook
+---
+
+### Load Packages
+
+```{r}
+library(ggplot2)
+library(readxl)
+library(gridExtra)
+library(scales)
+
+```
+
+### Import Data from Excel
+
+```{r}
+
+Typical_Employee_Survey_Data <- read_excel("C:/Users/jprom/Desktop/Class Notes/Class Fall 2023/Business Forecasting/Week 2/HW/Typical_Employee_Survey_Data.xlsx", 
+    col_names = FALSE)
+
+#View(Typical_Employee_Survey_Data)
+
+```
+
+### Duplicate Data
+
+```{r}
+
+survey_data <- Typical_Employee_Survey_Data
+
+head(survey_data)
+
+```
+### Convert to Dataframe
+
+```{r}
+survey_data <- data.frame(survey_data)
+
+str(survey_data)
+
+summary(survey_data)
+```
+## Data Cleaning
+
+### Change Column Names
+
+```{r}
+colnames(survey_data) <- c('Age','Gender','Job_Sat','Job_Char','Yrs_Emplyd','Prom_5yr','Make_Decision',
+                           'Bud_Decisions','Proud_Org', 'Decline_Incr_Pay','Work_Relation')
+head(survey_data)
+```
+
+### Check for Missing Values
+
+```{r}
+
+total_obs <- ncol(survey_data)*nrow(survey_data)
+
+total_obs
+
+na_count <- sum(is.na(survey_data))
+
+na_count
+```
+
+### Set Appropriate Data Types
+
+```{r}
+
+# Set Factor Variables
+
+survey_data$Gender <- factor(survey_data$Gender, labels = c("M","F"))
+survey_data$Gender[1:20]
+
+# Overall Job Satisfaction Ranking
+
+survey_data$Job_Sat <- factor(survey_data$Job_Sat, 
+                              levels = c(4,3,2,1), 
+                              labels = c("VDis_Sat","ModDis_Sat","Mod_Sat","V_Sat"), 
+                              ordered= T)
+survey_data$Job_Sat[1:20]
+
+# Important Job Characteristics
+
+survey_data$Job_Char <- factor(survey_data$Job_Char,
+                               labels = c("High_Income", "NoDanger_Fired", "Flex_Hours", "Opps_Advanc", "Enjoy_Work"))
+survey_data$Job_Char[1:20]
+
+# Likely to be Promoted in 5 Years
+
+survey_data$Prom_5yr <- factor(survey_data$Prom_5yr, 
+                              levels = c(5,4,3,2,1), 
+                              labels = c("V_Unlikely", "Unlikely", "Unsure", "Likely", "V_Likely"), 
+                              ordered= T)
+survey_data$Prom_5yr[1:20]
+
+# Take Part in Decision Making
+
+survey_data$Make_Decision <- factor(survey_data$Make_Decision, 
+                              levels = c(4,3,2,1), 
+                              labels = c("Never", "SomeTime", "MuchTime", "Always"), 
+                              ordered= T)
+survey_data$Make_Decision[1:20]
+
+# Participate in Budget Decisions
+
+survey_data$Bud_Decisions <- factor(survey_data$Bud_Decisions, 
+                              levels = c(1,2), 
+                              labels = c("Yes", "No"))
+
+survey_data$Bud_Decisions[1:20]
+
+# Proud to Work For Organization
+
+survey_data$Proud_Org <- factor(survey_data$Proud_Org, 
+                              levels = c(4,3,2,1), 
+                              labels = c("Not_Proud", "Indifferent", "Some_Proud", "Proud"), 
+                              ordered= T)
+survey_data$Proud_Org[1:20]
+
+# Turn down another job for more pay to stay with org.
+
+survey_data$Decline_Incr_Pay <- factor(survey_data$Decline_Incr_Pay, 
+                              levels = c(5,4,3,2,1), 
+                              labels = c("V_Unlikely", "Unlikely", "Unsure", "Likely", "V_Likely"), 
+                              ordered= T)
+
+survey_data$Decline_Incr_Pay[1:20]
+
+# Relationship with Co-workers
+
+survey_data$Work_Relation <- factor(survey_data$Work_Relation, 
+                              levels = c(5,4,3,2,1), 
+                              labels = c("Very_Bad", "Bad", "So_So", "Good", "Very_Good"), 
+                              ordered= T)
+survey_data$Work_Relation[1:20]
+
+```
+## Exploratory Data Analysis
+
+```{r}
+# Data Summary
+
+summary(survey_data)
+```
+
+
+```{r, echo=TRUE, fig.height=10, fig.width=10}
+
+# Plot of all columns
+
+pairs(~ Age + Gender + Job_Sat + Job_Char + Yrs_Emplyd + Prom_5yr + Make_Decision +
+        Bud_Decisions + Proud_Org + Decline_Incr_Pay + Work_Relation, data = survey_data)
+
+```
+
+### Observations:
+
+- There appears to be a relationship between Age and Years Employed.
+- All other factor variables show some interaction with numeric variables, and need to be further explored. It may be possible that age and yrs employed can have an impact on how employees respond to the survey.
+- Some possible relationships between factor variables can be observed where there is no clear grid pattern. For example Job Satisfaction vs. Willingness to decline a higher paying job and other need to be explored.
+
+### Boxplot of Numeric Variables
+
+```{r, echo=TRUE, fig.height=4, fig.width=5}
+
+bplot <- boxplot(survey_data[,c(1,5)])
+
+```
+### Observations
+
+- Employees surveyed have an age range of 20 to 64 years, with median age of 38.
+- About 50% of the employees fall within an age range of 33 to 44, with some outliers greater than 60 years old.
+- Most employees have been employed with the company approx. less than 11 years.
+- There are several potential outliers who have been employed with the company for more than 20 years.
+
+### Plot QQ Plots for Numeric Values
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+age_qq <- ggplot(survey_data) +
+                aes(sample = Age) +
+                geom_qq() +
+                geom_qq_line(color = "Red") +
+                labs(title = "Normal QQ Plot", y = "Age")
+
+
+yrs_qq <- ggplot(survey_data) +
+                aes(sample = Yrs_Emplyd) +
+                geom_qq() +
+                geom_qq_line(color = "Red") +
+                labs(title = "Normal QQ Plot", y = "Yrs Employed")
+
+grid.arrange(age_qq,yrs_qq, ncol=2)
+```
+### Observations
+
+- Age has a somewhat normal distribution but is impacted by some higher than expected ages above 50.
+- Years employed does not seem to follow a normal distribution and is impacted by extreme values at the tails.
+
+### Histograms & Density for Numeric Values
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+# Histograms & Density
+
+h_plot1<- ggplot(survey_data, aes(x = Age)) + 
+                geom_histogram(aes(y = ..density.., binwidth = 10), color = "Black", fill = "blue") +
+                geom_density(lwd = 1, colour = "Red" ) +
+                labs(title = "Age - Histogram/Density", y = "Density")
+
+h_plot2 <- ggplot(survey_data, aes(x = Yrs_Emplyd)) + 
+                geom_histogram(aes(y = ..density.., binwidth = 10), color = "Black", fill = "blue") +
+                geom_density(lwd = 1, colour = "Red" ) +
+                labs(title = "Years Employed - Histogram/Density", y = "Density")
+
+age_sex <-ggplot(survey_data, aes(x=Age, y=Yrs_Emplyd))+
+                    geom_point(alpha=I(1/2), color = "Blue") +
+                    geom_smooth(method = "lm", color = "Red", formula = y~x, se = FALSE)+
+                    labs(title = "Age vs Years Employed")
+
+
+grid.arrange(h_plot1,h_plot2,age_sex, ncol=3)
+```
+
+### Observations
+ - Age has a slight right skew showing the company may have higher than average number of employees who are 50 or older.
+- Years employed is showing  clear right skew, which is reasonable since few people stay with a company for more than 10 years.
+- Years employed shows many of the employees have less than 5 years with the company, which could signal that the company does not provide motivation or opportunities for the employees to stay with the company.
+- Scatter plot shows a positive relationship between age and yrs employed, however the dispersion of the points increases when both variables increase, meaning there is a high number of employees greater than 50 who have been with the company just a few years and many years.
+
+### Plot Gender Data
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+gen1 <- ggplot(survey_data, aes(x=Gender)) + geom_bar()
+
+gen2 <- ggplot(survey_data,aes(x=Gender, y=Age)) + geom_boxplot()
+
+gen3 <- ggplot(survey_data,aes(x=Gender, y=Yrs_Emplyd)) + geom_boxplot()
+
+grid.arrange(gen1, gen2, gen3, ncol=3)
+
+```
+
+### Observations
+
+- Company has more male than females but median age for both groups is similar near 38.  
+- Most of the female employees are slightly older than males, but there are more males who are greater than 60.
+- There is a higher number of males who have been employed with the company for more than 20 yrs.
+
+### Plot Job Satisfcation
+
+```{r}
+
+# Job Satisfaction Pie Chart
+
+js <- survey_data$Job_Sat
+
+js_tot <- length(js)
+
+js_count <- data.frame(table(survey_data$Job_Sat))
+
+js_count$percent <- js_count$Freq/js_tot
+
+js_count$labels <- percent(js_count$percent)
+
+js_count
+
+splot1 <- ggplot(js_count, aes(x = "", y = percent, fill = Var1)) +
+                  geom_col() +
+                  geom_text(aes(label = labels),
+                  position = position_stack(vjust = 0.7)) +
+                  coord_polar(theta = "y")
+
+splot1
+```
+
+### Obseravations
+- Approx. 905 of the employees are satisfied and more than 50% are very satisfied, which is good for retaining and attracting talent. 
+- However, it would be important to see why so many employees don't stay with the company even though they are satisfied.
+
+### Plot Job Satisfaction vs Gender & Yrs Employed
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+# Job Satisfaction by Gender
+
+splot2 <- ggplot(survey_data, aes(x=Job_Sat, fill = Gender)) + geom_bar()
+
+# Job Satisfaction vs Yrs Employed
+
+splot3 <- ggplot(survey_data, aes(y=Yrs_Emplyd, x=Job_Sat)) + geom_boxplot()
+
+grid.arrange(splot2, splot3, ncol=2)
+
+```
+
+### Observations
+
+- Most of the very dissatisfied employees are female.
+- Satisfied employees appear approx. evenly split between male and female.
+- Most of the dissatisfied and moderately dissatisfied employees have been with the company less than 10 years. Need to explore if this sentiment is recent or why they have stayed with the company even though they are not fully satisfied.
+
+### Plots for Important Job Characteristics
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+char1 <- ggplot(survey_data, aes(x=Job_Char, fill = Gender)) + geom_bar()
+
+char2 <- ggplot(survey_data,aes(x=Job_Char, y=Yrs_Emplyd)) + geom_boxplot()
+
+grid.arrange(char1, char2, ncol=2)
+
+```
+### Observations
+
+- Most male and female employees want to enjoy the type of work they do, but would also like to earn a high income. 
+- More females than males would like more opportunities for advancement. 
+- Employees value high income and enjoy their work appear to have stayed with the company longer.
+
+### Likely To Be Promoted in 5 years
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+prom1 <- ggplot(survey_data, aes(x=Prom_5yr, fill = Gender)) + geom_bar()
+
+prom2 <- ggplot(survey_data,aes(x=Prom_5yr, fill = Job_Sat)) + geom_bar()
+
+grid.arrange(prom1, prom2, ncol=2)
+
+```
+
+### Observations
+- Most employees are unsure or believe it is unlikely that they will be promoted in the next five years, which combined with the desire to earn higher income could lead them to not remain with the company.
+- Interestingly employees who do not believe they won't receive a promotion are satisfied with their job, so its important to determine what factors may drive them to leave the company.
+
+### Plot Ability to Make Decisions
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+mak1 <- ggplot(survey_data, aes(x=Make_Decision, fill = Gender)) + geom_bar()
+
+mak2 <- ggplot(survey_data,aes(x=Make_Decision, fill = Job_Sat)) + geom_bar()
+
+grid.arrange(mak1, mak2, ncol=2)
+
+```
+
+```{r}
+
+mak3 <- ggplot(survey_data,aes(x=Make_Decision, y=Yrs_Emplyd)) + geom_boxplot()
+mak3
+
+```
+
+### Observations
+
+- Most employees have the ability to make decision much of the time or always. Most of these employees are satisfied with their job.
+- Making decisions may not be important since most employees who do not have this ability are also satisfied. 
+- Making decision may impact length of employment since employees who do not make decision appear to have worked for the company for longer.
+
+
+### Plot Budget Decisions
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+bud1 <- ggplot(survey_data, aes(x=Bud_Decisions, fill = Gender)) + geom_bar()
+
+bud2 <- ggplot(survey_data,aes(x=Job_Sat, fill = Bud_Decisions)) + geom_bar()
+
+grid.arrange(prom1, prom2, ncol=2)
+
+```
+
+### Observations
+
+- Appears more females are involved in making budgetary decisions.
+- Most employees are not involved in making budgetary decisions, yet they are satisfied.
+- Most unsatisfied employees are the ones who do not make budget decisions, so may need to explore if budget decisions are impacting their job satisfaction.
+
+### Plot Proud of Organization
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+prd1 <- ggplot(survey_data, aes(x=Proud_Org, fill = Gender)) + geom_bar()
+
+prd2 <- ggplot(survey_data,aes(x=Proud_Org, y=Yrs_Emplyd)) + geom_boxplot()
+
+grid.arrange(prd1, prd2, ncol=2)
+
+```
+
+### Observations
+
+- Appears being proud of the organization may contribute to longer employment with the company.
+- Most employees are somewhat or proud of the organization, with mostly men feeling indifferent or not proud.
+
+### Plot Turn Down A Higher Paying Job
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+dec1 <- ggplot(survey_data, aes(x=Decline_Incr_Pay, fill = Gender)) + geom_bar()
+
+dec2 <- ggplot(survey_data, aes(x=Decline_Incr_Pay, fill = Job_Sat)) + geom_bar()
+
+grid.arrange(dec1, dec2, ncol=2)
+
+```
+
+### Observations
+
+- The charts show that most employees would not turn down a higher paying job, with most of them being females.
+- Compensation could be an issue for this company since many of the employees who would leave for higher paying jobs are satisfied with their work.
+
+
+### Plot Workplace Relationship Ratings
+
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+rel1 <- ggplot(survey_data, aes(x=Work_Relation, fill = Gender)) + geom_bar()
+
+rel2 <- ggplot(survey_data, aes(x=Work_Relation, fill = Job_Sat)) + geom_bar()
+
+grid.arrange(rel1, rel2, ncol=2)
+
+```
+
+### Observations
+
+- Most employees appear to have good working relationships.
+- The graphs also show that having good relationships can lead to higher job satisfaction.
+
+
