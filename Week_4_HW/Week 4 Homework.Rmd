@@ -1,0 +1,369 @@
+---
+title: "Business Forecasting HW- Week 3"
+author: "Juan Romo"
+output: html_notebook
+---
+
+
+Load Libraries
+
+```{r}
+
+library(ggplot2)
+library(readxl)
+library(gridExtra)
+library(scales)
+library(fpp)
+library(fpp2)
+library(TTR)
+library(formattable)
+
+```
+
+Load Data
+
+```{r}
+
+Tesla_Clean_Data <- read_excel("C:/Users/jprom/Desktop/Class Notes/Class Fall 2023/Business Forecasting/Week 4/Week 4 HW/Tesla Clean Data.xlsx")
+
+View(Tesla_Clean_Data)
+
+```
+
+Copy Data
+
+```{r}
+
+tsla_rev <- as.data.frame(Tesla_Clean_Data)
+
+summary (tsla_rev)
+
+```
+
+Drop all unnecessary columns
+
+```{r}
+
+tsla_rev <- tsla_rev[-c(1,4:21)]
+
+head(tsla_rev)
+
+```
+
+Check for missing values
+
+```{r}
+
+total_obs <- ncol(tsla_rev)*nrow(tsla_rev)
+
+total_obs
+
+na_count <- sum(is.na(tsla_rev))
+
+na_count
+
+```
+
+Convert Qtr_End column to date data type
+
+```{r}
+
+tsla_rev$Qtr_End <- as.Date(tsla_rev$Qtr_End,format = "%m/%d/%Y")
+
+class(tsla_rev$Qtr_End)
+
+head(tsla_rev)
+
+```
+
+Rename Columns
+
+```{r}
+
+colnames(tsla_rev) <- c('Qtr_End_Date', 'Total_Revenue')
+
+head(tsla_rev)
+```
+
+Convert Total Revenue to time Series
+
+```{r}
+
+tsla_rev$Total_Revenue <- ts(tsla_rev$Total_Revenue, start = c(2013,3), end = c(2023,2), frequency = 4)
+
+class(tsla_rev$Total_Revenue)
+
+plot(tsla_rev$Total_Revenue)
+
+```
+Take a subset of the last 5 years of data
+
+```{r}
+
+tsla_5yrRev <- as.data.frame(window(tsla_rev$Total_Revenue, start = c(2018, 1), end = c(2023,2)))
+
+colnames(tsla_5yrRev) <- c('Total_Rev')
+
+plot(tsla_5yrRev$Total_Rev)
+
+```
+
+Revenue 5 Year Summary Statistics
+
+```{r}
+
+summary(tsla_5yrRev$Total_Rev)
+
+```
+
+Plot Histogram and Box Plot
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+hist_plot <- ggplot(tsla_5yrRev, aes(x = Total_Rev)) + 
+                    geom_histogram(binwidth = 2500, color = "Black", fill = "blue") +
+                    labs(title = "Tesla Total Revenue ($M)")
+
+box_plot <- ggplot(tsla_5yrRev, aes(y = Total_Rev)) + 
+                    geom_boxplot() +
+                    labs(title = "Tesla Total Revenue ($M)")
+
+qq_plot <- ggplot(tsla_5yrRev) +
+                aes(sample = Total_Rev) +
+                geom_qq() +
+                geom_qq_line(color = "Red") +
+                labs(title = "Normal QQ Plot", y = "Tesla Revenue")
+
+grid.arrange(hist_plot,box_plot, qq_plot, ncol=3)
+
+```
+
+Observations:
+
+- Tesla histogram and qq plot show revenue does not appear to be normally distributed and skewed right. This is congruent with the the plot of the time series where revenues are consistently increasing, with higher revenue occurring less frequently in more recent time periods.
+
+- The box plot shows that the median revenue is approx. $10B. However, the range of the long tail is larger than the 1st and 2nd, which could be an indication of a significant change in the company that resulted in faster revenue growth.
+
+- Possibly factors such as production capacity created a lower bound for revenue initially and were overcome once new production facilities were online, thus producing a right skewed distribution.
+
+Auto- Correlation Plot
+
+```{r}
+
+Acf(tsla_5yrRev)
+
+```
+
+Observations:
+
+- ACF Plot of Tesla revenue show a significant correlation with the prior 4 quarters, indicating that the most recent periods will be most indicative of future revenue.
+
+- The plot also shows a steady declining correlation, meaning there is a clear upward trend and no seasonality within their revenue.
+
+
+Naive & Mean Forecast
+
+```{r}
+
+mean_fc <- meanf(tsla_5yrRev$Total_Rev, h=4)
+
+mean_fc_a <- accuracy(mean_fc)
+
+mean_fc_a
+
+plot(mean_fc)
+
+naive_fc <- naive(tsla_5yrRev$Total_Rev, h=4)
+
+naive_fc_a <- accuracy(naive_fc)
+
+naive_fc_a
+
+plot(naive_fc)
+
+```
+Observations:
+
+- Using the mean as a forecasting method is not appropriate since it does not account for the upward trend shown in the data.
+
+- The naive method also does not appear to acurrately capture the upward trend the data.
+
+
+Seasonal Naive & Drift Method Forecast
+
+```{r}
+rwf_fc <- rwf(tsla_5yrRev$Total_Rev, h=4, drift = TRUE)
+
+rwf_fc_a <- accuracy(rwf_fc)
+
+rwf_fc_a
+
+plot(rwf_fc)
+
+snaive_fc <- snaive(tsla_5yrRev$Total_Rev, h=4)
+
+snaive_fc_a <- accuracy(snaive_fc)
+
+snaive_fc_a
+
+plot(snaive_fc)
+
+```
+Observations:
+
+- The Drift method does a better job at capturing the upward trend vs prior methods but shows revenue as continuously increasing which may not be accurate as show by prior period declines.
+
+- The seasonal naive method also shows more modest upward trend but also accounts for periodic decreases in revenue which is in line with actual changes in revenue.
+
+
+Moving Average Forecasts
+
+```{r}
+
+ma4_mod <-  ma(tsla_5yrRev$Total_Rev, order = 4)
+
+ma4_fc <- forecast(ma4_mod,4)
+
+attributes(ma4_fc)
+
+autoplot(ma4_fc)
+
+summary(ma4_fc)
+
+ma4_fc_a <- accuracy(ma4_fc)
+
+ma8_mod <-  ma(tsla_5yrRev$Total_Rev, order = 8)
+
+ma8_fc <- forecast(ma8_mod, 4)
+
+autoplot(ma8_fc)
+
+summary(ma8_fc)
+
+ma8_fc_a <- accuracy(ma8_fc)
+
+```
+
+ETS Model
+
+```{r}
+
+ets_mod <- ets(tsla_5yrRev$Total_Rev)
+
+ets_fc <- forecast(ets_mod, h=4)
+
+attributes(ets_fc)
+
+plot(ets_fc)
+
+summary(ets_fc)
+
+ets_fc_a <- accuracy(ets_fc)
+
+```
+
+Observations:
+
+- ETS method showed that the optimal model is an (ANN) or simple exponential smoothing model where there are additive errors (alpha), no trend (beta=0), and no seasonality in the data (gamma=0).
+
+- The high alpha value of 0.99 shows more recent values get a greater weighting. This model is very close to the naive method.
+
+Holts-Winters Model
+
+```{r}
+
+hw_mod <- HoltWinters(tsla_5yrRev$Total_Rev)
+
+hw_fc <- forecast(hw_mod, 4)
+
+plot(hw_fc)
+
+attributes(hw_mod)
+
+summary(hw_fc)
+
+hw_fc_a <- accuracy(hw_fc)
+
+hw_mod$alpha
+hw_mod$beta
+hw_mod$gamma
+hw_mod$SSE
+
+```
+Observations
+- The Holt Winters method shows $\alpha$ = 0.30, $\beta$ = 1, $\gamma$ = 0.63, meaning there is:
+- Lower alpha means there is a lower importance to more recent values when determining the level (or the average of the values).
+- Beta of 1 means that the trend or increasing or decreasing component is strongly impacted by the most recent values.
+- Gamma value of 0.6 means there is some seasonality present in the data that is impacted by somewhat recent values.
+  
+
+Simple Smoothing Equation (SSE) Model
+
+```{r}
+
+SSE_mod <- HoltWinters(tsla_5yrRev$Total_Rev, beta = FALSE, gamma = FALSE)
+
+SSE_fc <- forecast(SSE_mod, 4)
+
+plot(SSE_fc)
+
+summary(SSE_fc)
+
+SSE_fc_a <- accuracy(SSE_fc)
+```
+Observations:
+
+- The simple smoothing equation shows that alpha is 0.99, meaning that it follows the naive method, using the most recent value to best predict the next period. 
+- This can also be observed in the graph which appears to be follow the same time series but lagged by a period.
+
+Plot Simple Models
+
+```{r}
+
+plot(mean_fc) # Mean Forecast
+  lines(naive_fc$mean, col="Blue") # Naive Forecast
+  lines(rwf_fc$mean, col="Green") # Random Walk Forecast
+  lines(snaive_fc$mean, col="Pink") # Seasonal Naive Forecast
+  lines(ma4_fc$fitted, col="Purple") # Moving average 4 periods
+  lines(ma8_fc$fitted, col="Orange") # Moving average 8 periods
+
+```
+
+Plot Smoothing Models
+
+```{r}
+
+autoplot(hw_fc, color="Blue", alpha = 0.5, PI=FALSE) + # PI attribute removes the confidence interval shading.
+  autolayer(ets_fc, series = "mean", color = "Orange", PI=FALSE) + # Not showing in graph because its overlapping with SSE model
+  autolayer(SSE_fc, series = "mean", color="Green", PI= FALSE, alpha = 0.5) +
+  guides(colour=guide_legend(title="Data series")) # Legend not appearing
+
+attributes(ets_fc)
+
+ets_fc$mean
+
+```
+
+Accuracy Measures Summary
+
+```{r}
+
+method <- c('Mean', 'Naive', 'RWF', 'Seasonal Naive', 'MA 4', 'MA 8', 'ETS', 'Holt-Winters', 'SSE')
+
+method <- data.frame(method)
+
+method
+
+acu_table <- data.frame(rbind(mean_fc_a, naive_fc_a, rwf_fc_a, snaive_fc_a, ma4_fc_a, ma8_fc_a, ets_fc_a, hw_fc_a, SSE_fc_a))
+
+acu_table <- data.frame(cbind(method, acu_table))
+
+format_table(acu_table)
+
+```
+
+Accuracy Measure Comparison
+
+- Mean Absolute Percentage Error (MAPE) was the measure chose to compare Tesla Revenue forecast models since it is not important to over or under estimate the amount but instead be as accurate as possible.
+
+- Based on the summary table of all the accuracy measures the best model appears to be 8 period moving average with the lowest MAPE of 1.39%. This is also confirmed by showing it has the lowest Mean Absolute Error (MAE) of 124  and Mean Percent Error (MPE) of 1.27%.
