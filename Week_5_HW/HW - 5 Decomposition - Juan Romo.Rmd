@@ -1,0 +1,227 @@
+---
+title: "Business Forecasting HW - Decomposition"
+author: "Juan Romo"
+output: html_notebook
+---
+
+
+**Load Library**
+
+```{r}
+
+library(readxl)
+library(fpp)
+library(fpp2)
+library(gridExtra)
+
+```
+
+**Load Data**
+
+- US Nominal GDP
+- Non-Seasonally Adjusted
+- Quarterly data from Q1-2010 to Q2-2023
+
+```{r}
+
+US_GDP <- read_excel("C:/Users/jprom/Desktop/Class Notes/Class Fall 2023/Business Forecasting/Week 5/HW/US Nominal GDP NSA Data.xlsx", sheet = "US Nominla GDP")
+
+View(US_Nominal_GDP_NSA_Data)
+
+```
+
+
+**Copy Data**
+
+```{r}
+
+US_GDP_df <- as.data.frame(US_GDP)
+
+nrow(US_GDP_df)
+
+head(US_GDP_df)
+
+str(US_GDP_df)
+
+```
+
+**Covert Period to Date Values**
+
+```{r}
+
+
+US_GDP_df$Period <- as.Date(as.yearqtr(US_GDP_df$Period, format = "Q%q %Y", frac = 1))
+
+head(US_GDP_df)
+
+```
+
+**Reverse Order & Convert to Time Series**
+
+```{r}
+
+US_GDP_df <- US_GDP_df[order(US_GDP_df$Period, decreasing = FALSE),]
+
+head(US_GDP_df)
+
+
+US_GDP_df$US_Nominal_GDP <- ts(US_GDP_df$US_Nominal_GDP, start = c(2010,1), frequency = 4)
+
+str(US_GDP_df)
+
+```
+**Plot Data**
+
+```{r}
+
+plot(US_GDP_df$US_Nominal_GDP, ylab = "US Nonminal GDP $Billions")
+```
+
+**Observations**
+ 
+ - The chart above shows an a consistent upward trend, with the exception of 2020 which saw GDP declines due to the global pandemic.
+ 
+ - Since this data is not adjusted for inflation, we would need to determine how much of the increasing trend is due to an actual expansion in the economy vs. an increases in prices.
+ 
+ - The pattern in trend appears to remain consistent around the trend, suggesting that an additive model would be appropriate for this data.
+
+ - The data also shows a consistent pattern with peaks and troughs which suggests that data contains seasonality.
+ 
+**Review Summary Statistics & Plots**
+
+```{r, echo=TRUE, fig.height=4, fig.width=10}
+
+summary(US_GDP_df)
+
+hist_plot <- ggplot(US_GDP_df, aes(x = US_Nominal_GDP)) + 
+                    geom_histogram(binwidth = 100, color = "Black", fill = "blue") +
+                    labs(title = "US Nominal GDP ($B)")
+
+box_plot <- ggplot(US_GDP_df, aes(y = US_Nominal_GDP)) + 
+                    geom_boxplot() +
+                    labs(title = "US Nominal GDP ($B)")
+
+qq_plot <- ggplot(US_GDP_df) +
+                aes(sample = US_Nominal_GDP) +
+                geom_qq() +
+                geom_qq_line(color = "Red") +
+                labs(title = "Normal QQ Plot", y = "US Nominal GDP ($B)")
+
+grid.arrange(hist_plot,box_plot, qq_plot, ncol=3)
+
+```
+
+**Check for Trend & Seasonality**
+
+```{r}
+
+Acf(US_GDP_df$US_Nominal_GDP)
+
+```
+**Observations**
+
+- The ACF plot shows there is a significant decreasing correlation between current quarter and past 8-12 quarters of data.
+
+- Correlation with past periods is consistent with assumption that business cycles change over periods greater than 1yr, with the exception of significant unexpected economic shocks.
+
+- The ACF plot also shows a consistent trend is present in the data and is evidence of consistent economic growth.
+
+- The plot shows a reoccurring pattern every 4 periods, where there is a peak in the Q1 quarter decline in Q2, and a constant values in Q3 & Q4.
+
+**Use Decomposition to identify the components of US GDP Data**
+
+```{r}
+
+gdp_decomp <- stl(US_GDP_df$US_Nominal_GDP,s.window ="periodic")
+
+plot(gdp_decomp)
+
+```
+```{r}
+attributes(gdp_decomp)
+
+?stl
+
+gdp_decomp$time.series
+
+summary(gdp_decomp)
+
+```
+
+**Observations**
+
+- The decomposition plot shows clearly defined seasonal component in the data that repeats every 4 quarters and ranges from +100 billion to -100 billion.
+
+- The chart also shows a clear upward trend from 4.2 Trillion to 5.5 Trillion with a period of decline in Q1 of 2022. This is also evident in the remainder which has a significant 
+
+- The remainder also appears to be consistent with +/- 50 billion, with the exception of 2020 which had a significant decline.
+
+- Given the small remainder could be indication that the decomposition method could be an appropriate forecasting method.
+
+**Plot Seasonally Adjusted Data**
+
+```{r}
+
+GDP_SA <- seasadj(gdp_decomp)
+
+GDP_SA
+
+plot(US_GDP_df$US_Nominal_GDP, ylab = "US Quarterly Nominal GDP") +
+  lines(GDP_SA, col="Blue")
+
+```
+
+**Observations**
+
+- Plot of the seasonally adjusted data follows actual data closely and shows clear upward trend.
+
+
+**Create a forecast using decomposition**
+
+```{r}
+
+GDP_FC <- forecast(gdp_decomp, h=4)
+
+plot(GDP_FC)
+
+summary(GDP_FC)
+```
+
+**Observations**
+
+- Summary of the forecast shows that the multiplicative method was use for the residuals and additive method was used for seasonality.
+
+- Alpha = 0.46 suggests that the level is estimated by placing an equivalent on recent and past values.
+
+- Beta = 0 suggests that the trend is driven by the average of all values.
+
+- A MAPE of 0.81% suggests that the method used is fairly accurate with an average of less than 1% deviation from the actual value.
+
+
+```{r}
+
+attributes(GDP_FC)
+
+GDP_FC$mean
+
+plot(as.numeric(GDP_FC$residuals))
+
+```
+
+```{r}
+
+hist(as.numeric(GDP_FC$residuals))
+
+qqnorm(as.numeric(GDP_FC$residuals))
+
+plot(as.numeric(GDP_FC$fitted), as.numeric(GDP_FC$residuals))
+     
+```
+
+**Observations**
+
+- A plot of the residuals appear to be random and centered zero with the exception of the values corresponding to 2020 and can be confirmed by reviewing a histogram & QQ Plot of the residuals.
+
+- Further analysis is needed to determine how this extreme value is impacting the overall model and if it should be removed or addressed in some manner.
+
+- Overall, the small MAPE value and analysis of the residuals suggests the decomposition method for forecasting could be appropriate 
