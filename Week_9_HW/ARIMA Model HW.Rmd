@@ -1,0 +1,327 @@
+---
+title: "ARIMA Assignment 6"
+output: html_notebook
+author: Juan Romo
+---
+
+# Load Libraries
+
+
+```{r}
+
+library(fpp)
+library(fpp2)
+library(readxl)
+
+```
+
+# Load Data
+
+- US Real GDP in 
+- Non-Seasonally Adjusted
+- Quarterly data from Q1-2010 to Q2-2023
+
+```{r}
+
+US_Nominal_GDP_NSA_Data <- read_excel("C:/Users/jprom/Desktop/Class Notes/Class Fall 2023/Business Forecasting/Week 9/HW Assignment 6 ARIMA/US Nominal GDP NSA Data.xlsx", 
+    sheet = "US Nominla GDP")
+
+View(US_Nominal_GDP_NSA_Data)
+
+# Create a copy of the data
+
+US_GDP_df <- as.data.frame(US_Nominal_GDP_NSA_Data)
+
+```
+
+# Clean Up Data
+
+```{r}
+
+# Set Date a date format
+
+US_GDP_df$Period <- as.Date(as.yearqtr(US_GDP_df$Period, format = "Q%q %Y", frac = 1))
+
+head(US_GDP_df)
+
+# Reverse Data Order
+
+US_GDP_df <- US_GDP_df[order(US_GDP_df$Period, decreasing = FALSE),]
+
+head(US_GDP_df)
+
+# Covert to Time Series
+
+GDP_Data <- ts(US_GDP_df$US_Nominal_GDP, start = c(2010,1), end = c(2023,2), frequency = 4)
+
+str(GDP_Data)
+
+```
+# Plot Time Series
+
+```{r}
+
+plot(GDP_Data)
+
+# Subset Data Example
+
+# Example subset the time series
+
+#GDP_2 <- window(GDP_Data, start=c(2015, 1), end=c(2023, 2))
+
+#plot(GDP_2)
+
+```
+# Observations:
+
+- The data has clear upward trend, with a significat decline in 2020 due to the economic effects of the corona virus pandemic.
+
+- The data also shows a seasonal pattern with well defined peaks and troughs that appear to repeat every 4 quarters.
+
+- Although there was a decline in 2020 to 2021 it appears that the GDP recovered in recent years and reverting back to the trend observed in years prior to the pandemic. Therefore, it seems that it may not necessary to subset the data since the change was temporary and there were no structural changes to the data after the decline.
+
+
+# Data Summary Statistics and Plots
+
+
+```{r}
+
+summary(GDP_Data)
+
+boxplot(GDP_Data)
+
+hist(GDP_Data, breaks = 10, col = "SteelBlue")
+
+# Plot QQ Plot of Data
+
+# qqnorm(GDP_Data) - Works but shows no line
+
+# qqline(GDP_Data, col = "Steelblue") - shows abline error
+
+# Can use qqPlot() function in "car" package - to get same results as above.
+
+library(car)
+
+qqPlot(GDP_Data)
+```
+# Observations
+- Descriptive statistics and plots above show that the GDP data is somewhat normally distributed, with the exception of around the tails which represent the early and recent years in the data.
+
+
+# ACF Plot & PACF
+
+- ACF plot gives you the gross correlation between the Y value and all its past values.
+-PACF plot gives you the simple correlation between Y value and its lags without the interaction of the intervening lags.
+- ACF and PACT give can give you a sense or guide to as what are some plausible ARIMA models. They can help select the ARIMA P & Q values.
+- P Value - tells you how many autoregressive lags to include in your model.
+- Q Value - tells you how many lags of the residuals to include in your model - The Q value helps to account for the possibility of a relationship between Y variable and the residuals from past periods - it tries to find signals in the errors. The goal of the MA portion of the ARIMA model is to minimize the noise in the data.
+```{r}
+
+# Use ACF plot to see if there is a trend or seasonality within the data.
+
+Acf(GDP_Data)
+
+# Plot PACF to see possible P value combinations to consider in the ARIMA model.
+
+Pacf(GDP_Data)
+
+# tsdisplay() function shows bot acf and pacf plots
+
+tsdisplay(GDP_Data)
+```
+
+# Observations
+
+- The ACF plot shows a clear upward trend. Also there are sign of seasonality. The ACF plot shows a decline in the first 2 lags and then an even level in lags 3 and 4.
+
+- The ACF shows there is a correlation between the current period and the 12 past values.
+
+- PACF shows there is only a significant correlation between the current period and the previous period.
+
+
+# Use Decomposition to determine if there is seasonality
+
+```{r}
+
+GDP_Decomp <- decompose(GDP_Data)
+
+GDP_Decomp
+
+plot(GDP_Decomp)
+
+```
+# Observations
+
+- Decomposition of the GDP data shows there is a clear upward trend. Also there is some seasonality present in the data. However, the impact of that seasonality only ranges from -100 to +100 million per period.
+
+- ARIMA model assumes data is stationary.Need to remove the trend from the data to make it stationary.
+- Need to use differentiation to make the data stationary.
+
+# Use differenation to make the data stationary
+
+```{r}
+
+# Use adf.test() function - Augmented Dickey Fuller Test tells you if the time series is stationary.
+# Tests uses Null Hypothesis - Time series is non stationary & Alternative hypothesis - data is Stationary
+# Data is non stationary if p value is less than significance level alpha. - reject the null hypothesis
+# ADF test says differences is required if p-value is > 0.05
+
+# Can also use Kipps test to determine if differencing is required.
+# Kipps test says differences is required if p-value is < 0.05
+
+library(tseries)
+
+adf.test(GDP_Data)
+
+
+kpss.test(GDP_Data)
+
+# the ndiffs() function tells you the number of rounds needed to make the data stationary. 
+# ndiffs() works with non-seasonal data.
+
+ndiffs(GDP_Data)
+
+# the nsdiffs() funtion tells you how many differences to you need
+# nsdiffs() only workds for seasonal data.
+
+nsdiffs(GDP_Data)
+
+```
+# Observations:
+
+- adf test shoes p-value of 0.35 - means that we cannot reject the null hypothesis therefore the data is non stationary.
+
+- ndiffs says we need to only do 1 round of differentiation to make the data stationary.
+
+- nsdiffs says we need to do 1 round of differentiation to make the data stationary.
+
+- *** Begin with seasonal differentiation since this may be enough to make the data stationary.
+
+# Seasonal Differtiation
+
+```{r}
+
+# use diff() function to do differentiation
+# the diff() parameter -> lag - is integer indicating which lag to use
+# the diff() parameter -> differences - is the integer indicating the order of the differences
+# Since the GDP data is quarter we must use a lag of 4
+
+GDP_ds1 <- diff(GDP_Data,lag = 4, differences = 1)
+
+plot(GDP_ds1)
+
+tsdisplay(GDP_ds1)
+
+adf.test(GDP_ds1)
+
+# test - ignore
+
+# tsdisplay(diff(GDP_ds1))
+```
+# Observations
+
+- Completing the seasonal differentiation was sufficient to make the data stationary. If this is not sufficient then another round of differentiation is needed.
+
+- The ACF and PACF plot shows there is a significant relationship with the lag 1 and 4.
+- Possible models include (P=1-4 lag values,d=1 order of differentiation, Q =1-4 residual lag values)
+
+
+# Fit Auto-ARIMA Model
+- auto.arima() function will automatically run optimization to find the best (PDQ) parameters - no need to do manipulate the data. The function will do the differentiation.
+- auto.arima chooses model with smaller BIC but larger AIC. We can fix this by turning off optimization, Stepwise = FALSE
+- approximation = false - is to force the ARIMA model to not use approximation and consider all possible outcomes when considering the model with the lowest BIC and AIC. This is helpful to see how the model is working.
+- trace = false is to display all models and their result
+
+
+```{r}
+
+#fit1 <- auto.arima(GDP_Data, stepwise=FALSE, approximation=FALSE, trace = TRUE)
+
+fit <- auto.arima(GDP_Data, stepwise=FALSE, approximation=FALSE, trace = FALSE)
+
+fit
+```
+# Obersevations
+
+- The ARIMA model above was selected as the optimal model as a result of its AIC and BIC values.
+- The models shows 1 AR lag for the non seasonal component and 2 lags for the Seasonal MA component.
+- The variance of the model is 5155, and has a AIC of 582 and BIC of 592.
+
+
+
+# Residual Analysis
+
+- Residuals should be random, normally distributed, and independent from each other(ACF and PACF plots).
+
+```{r}
+attributes(fit)
+
+res <- fit$residuals
+
+str(res)
+
+res
+
+plot(res)
+
+plot(as.double(res))
+
+
+```
+
+```{r}
+
+#plot residuals vs fitted - there should be no pattern
+
+# plot(fit$fitted,fit$fitted) # this does not plot correctly because data is stored as time series and R tries to connect the dots
+
+#library(tidyverse)
+
+cbind(Fitted = fitted(fit),
+      Residuals=residuals(fit)) %>%
+  as.data.frame() %>%
+  ggplot(aes(x=Fitted, y=Residuals)) + geom_point()
+
+# plot histogram of residuals
+
+hist(res, breaks = 50)
+
+# plot qq plot of residuals
+
+qqPlot(res)
+
+# Plot ACF and PACF 
+
+tsdisplay(res)
+
+
+```
+
+# Observations
+
+ - The residuals vs fitted values don't show any patterns which shows they are independent of the model.
+ - The residuals appear to be normally distributed with a mean of zero. Although, there is one oultier value which may be impacting the model, so more analysis or other models without this value should be considered.
+ - The ACF and PACF don't show any significant correlation within the residuals.
+ -Overall, analsysis of the residuals shows this could be a valid model, but will need to be compared to others in order to find the best model.
+ 
+ # Forecast Next 5 periods
+ 
+```{r}
+
+fc1 <- forecast(fit, h=5)
+
+plot(fc1)
+
+# show the predicted values
+
+#attributes(fc1)
+
+fc1$mean
+
+# Print accuracy measures of the model
+
+accuracy(fc1)
+
+```
+ 
+ 
